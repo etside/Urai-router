@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "urai-router"
+version = "0.1.0"
+description = "Automatic API-key router, MCP server and OpenCode/Kiro configurator for LLM providers"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Urai" }]
+keywords = ["llm", "router", "mcp", "opencode", "kiro", "api-keys", "openai-compatible"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: POSIX :: Linux",
+  "Topic :: Software Development :: Libraries",
+  "Topic :: System :: Networking",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4", "build>=1.0"]
+
+[project.scripts]
+urai-router = "urai_router.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/etside/Urai-router"
+Issues = "https://github.com/etside/Urai-router/issues"
+
+[tool.setuptools]
+packages = ["urai_router"]
+
+[tool.setuptools.package-data]
+urai_router = ["skills/*/SKILL.md", "data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

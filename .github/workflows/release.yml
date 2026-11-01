@@ -1,0 +1,42 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.1.0)"
+        required: true
+        default: "v0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Build sdist, wheel and zipapp
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+          mkdir -p build/app
+          cp -r urai_router build/app/
+          python -m zipapp build/app -m "urai_router.cli:main" -o dist/urai-router.pyz
+          chmod +x dist/urai-router.pyz
+          ls -lh dist
+      - name: Publish with gh (GitHub Actions token)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" dist/* --clobber
+          else
+            gh release create "$TAG" dist/* --generate-notes --target "$GITHUB_SHA"
+          fi

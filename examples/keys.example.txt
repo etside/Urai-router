@@ -1,0 +1,17 @@
+# Copy to ~/.config/urai-router/keys.txt and chmod 600.
+# Never commit real keys.
+
+# --- OpenCode Zen (free models included; catalogue is public) ---
+opencode:sk-REPLACE_ME
+
+# --- other providers (prefix is optional when the key is recognizable) ---
+# openrouter:sk-or-v1-REPLACE_ME
+# groq:gsk_REPLACE_ME
+# deepseek:sk-REPLACE_ME
+# anthropic:sk-ant-REPLACE_ME
+# google:AIzaREPLACE_ME
+# xai:xai-REPLACE_ME
+# openai:sk-proj-REPLACE_ME
+
+# --- labels and weights control rotation ---
+# opencode:sk-SECOND_KEY   # label=backup weight=1

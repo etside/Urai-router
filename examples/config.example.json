@@ -1,0 +1,43 @@
+{
+  "host": "127.0.0.1",
+  "port": 8787,
+  "token": "",
+  "max_attempts": 8,
+  "default_model": "auto",
+  "prefer_free": true,
+  "catalog_ttl": 900,
+  "zen_ttl": 300,
+  "request_timeout": 120,
+  "cooldowns": {
+    "rate": 60,
+    "invalid": 1800,
+    "server": 20,
+    "network": 15,
+    "max": 3600
+  },
+  "aliases": {
+    "fast": "opencode/deepseek-v4.1-flash-free",
+    "cheap": "free"
+  },
+  "providers": {
+    "my-gateway": {
+      "name": "My Gateway",
+      "base_url": "https://gateway.example.com/v1",
+      "api_style": "openai",
+      "default_models": ["my-model"]
+    }
+  },
+  "proxy": {
+    "cors": true,
+    "log_requests": true
+  },
+  "opencode": {
+    "provider_id": "urai-router",
+    "set_default": false,
+    "model_limit": 300
+  },
+  "kiro": {
+    "agent_name": "urai-router",
+    "scope": "global"
+  }
+}

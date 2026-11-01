@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "urai-router": {
+      "command": "urai-router",
+      "args": ["mcp"],
+      "env": {
+        "URAI_KEYS_FILE": "/home/YOU/.config/urai-router/keys.txt"
+      },
+      "disabled": false,
+      "timeout": 30000
+    }
+  }
+}
