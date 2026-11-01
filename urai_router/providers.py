@@ -315,14 +315,19 @@ def register_custom(id: str, values: Dict[str, Any]) -> Provider:
     base_url = str(values.get("base_url") or values.get("baseURL") or "").rstrip("/")
     if not id or not base_url:
         raise ValueError("custom provider needs an id and base_url")
+    keyless = bool(values.get("keyless", False))
+    if values.get("auth"):
+        auth = str(values["auth"])
+    else:
+        auth = "none" if keyless else "bearer"
     provider = Provider(
         id=id,
         name=str(values.get("name") or id),
         base_url=base_url,
         models_url=values.get("models_url"),
         api_style=str(values.get("api_style") or "openai"),
-        auth=str(values.get("auth") or ("none" if not values.get("key") else "bearer")),
-        keyless=bool(values.get("keyless", False)),
+        auth=auth,
+        keyless=keyless,
         detect_order=int(values.get("detect_order", 60)),
         docs=str(values.get("docs") or ""),
         default_models=tuple(values.get("default_models") or ()),
