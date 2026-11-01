@@ -58,10 +58,10 @@ class FakeUpstream(BaseHTTPRequestHandler):
         if model == "bad-model":
             self._json(400, {"error": {"message": "bad model", "type": "invalid_request_error"}})
             return
-        if key == "bad":
+        if key.startswith("bad"):
             self._json(401, {"error": {"message": "invalid key", "type": "authentication_error"}})
             return
-        if key == "rate":
+        if key.startswith("rate"):
             self.send_response(429)
             payload = json.dumps({"error": {"message": "rate limited"}}).encode()
             self.send_header("Retry-After", "1")
@@ -69,7 +69,7 @@ class FakeUpstream(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(payload)
             return
-        if key == "server":
+        if key.startswith("server"):
             self._json(500, {"error": {"message": "upstream boom"}})
             return
         if body.get("stream"):
@@ -84,7 +84,8 @@ class FakeUpstream(BaseHTTPRequestHandler):
                         "object": "chat.completion.chunk",
                         "model": model,
                         "choices": [{"index": 0, "delta": {"content": token}, "finish_reason": None}],
-                    }
+                    },
+                    separators=(",", ":"),
                 )
                 self.wfile.write(f"data: {chunk}\n\n".encode())
                 self.wfile.flush()
@@ -156,14 +157,17 @@ def fake_router(tmp_env: Path, fake_upstream):
                     "default_models": ["test-model"],
                 }
             },
-            "catalog_ttl": 0,
+            "catalog_ttl": 3600,
             "request_timeout": 10,
             "max_attempts": 6,
         },
     )
     cfg = Config(data=deep_merge({}, json.loads(config_path.read_text())), path=config_path)
+    from urai_router.providers import apply_provider_overrides
+
+    apply_provider_overrides(cfg.provider_overrides)  # must happen before keys are parsed
     keys_path = tmp_env / "keys.txt"
-    keys_path.write_text("fake:good # label=good\n")
+    keys_path.write_text("fake:good-key-0001 # label=good\n")
     store = KeyStore(keys_path, cfg, state_path=tmp_env / "keys-state.json")
     router = Router(cfg, store)
     # Isolate the registry so catalogue tests never touch the public network.

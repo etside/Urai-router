@@ -300,7 +300,7 @@ ALIASES: Dict[str, str] = {
 def provider_id(name: str) -> Optional[str]:
     if not name:
         return None
-    key = str(name).strip().lower().replace("_", "-")
+    key = str(name).strip().lower().replace("_", "-").replace(" ", "-")
     if key in PROVIDERS:
         return key
     return ALIASES.get(key)
@@ -355,17 +355,25 @@ def apply_provider_overrides(overrides: Dict[str, Dict[str, Any]]) -> None:
 
 
 def detect_by_prefix(key: str) -> List[str]:
+    """Return providers sharing the *most specific* matching prefix.
+
+    ``sk-or-v1-...`` also starts with the generic ``sk-`` shared by DeepSeek,
+    Moonshot and Zen, so only the longest prefix should win.
+    """
     matches: List[Tuple[int, str]] = []
     for provider in PROVIDERS.values():
         if provider.keyless:
             continue
         for prefix in provider.key_prefixes:
             if key.startswith(prefix):
-                matches.append((-len(prefix), provider.id))
+                matches.append((len(prefix), provider.id))
                 break
+    if not matches:
+        return []
+    best = max(length for length, _ in matches)
     seen: List[str] = []
-    for _, pid in sorted(matches):
-        if pid not in seen:
+    for length, pid in sorted(matches, key=lambda row: (-row[0], row[1])):
+        if length == best and pid not in seen:
             seen.append(pid)
     return seen
 

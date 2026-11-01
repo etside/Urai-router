@@ -58,37 +58,37 @@ def test_mask_never_leaks_full_key():
 
 def test_weighted_round_robin(tmp_path, tmp_env):
     path = tmp_path / "keys.txt"
-    path.write_text("fake:key-aaaaaaaa # weight=3\nfake:key-bbbbbbbb # weight=1\n")
+    path.write_text("groq:gsk_aaaaaaaa # weight=3\ngroq:gsk_bbbbbbbb # weight=1\n")
     store = KeyStore(path, Config(), state_path=tmp_path / "state.json")
     labels = []
     for _ in range(8):
-        key = store.select("fake")
+        key = store.select("groq")
         labels.append(key.value)
-    assert labels.count("key-aaaaaaaa") == 6
-    assert labels.count("key-bbbbbbbb") == 2
+    assert labels.count("gsk_aaaaaaaa") == 6
+    assert labels.count("gsk_bbbbbbbb") == 2
 
 
 def test_cooldown_and_success(tmp_path):
     path = tmp_path / "keys.txt"
-    path.write_text("fake:key-aaaaaaaa\n")
+    path.write_text("groq:gsk_aaaaaaaa\n")
     store = KeyStore(path, Config(), state_path=tmp_path / "state.json")
     key = store.keys[0]
     store.mark_failure(key, "rate", retry_after=30)
     assert not key.available()
-    assert store.select("fake") is None
-    assert store.next_retry_after("fake") is not None
+    assert store.select("groq") is None
+    assert store.next_retry_after("groq") is not None
     store.mark_success(key)
-    assert key.available() and store.select("fake") is key
+    assert key.available() and store.select("groq") is key
 
 
 def test_reload_keeps_health(tmp_path):
     path = tmp_path / "keys.txt"
-    path.write_text("fake:key-aaaaaaaa\n")
+    path.write_text("groq:gsk_aaaaaaaa\n")
     store = KeyStore(path, Config(), state_path=tmp_path / "state.json")
     store.mark_failure(store.keys[0], "invalid")
     store.save_state(force=True)
     old_strikes = store.keys[0].strikes
-    path.write_text("fake:key-aaaaaaaa\nfake:key-bbbbbbbb\n")
+    path.write_text("groq:gsk_aaaaaaaa\ngroq:gsk_bbbbbbbb\n")
     assert store.reload(force=True)
     assert len(store.keys) == 2
     assert store.keys[0].strikes == old_strikes

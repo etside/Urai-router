@@ -16,31 +16,31 @@ def _chat(router, model="fake/test-model", stream=False):
 
 def test_failover_on_401(fake_router):
     store = fake_router["store"]
-    store.path.write_text("fake:bad # label=bad\nfake:good # label=good\n")
+    store.path.write_text("fake:bad-key-0001 # label=bad\nfake:good-key-0001 # label=good\n")
     store.reload(force=True)
     result = _chat(fake_router["router"])
     assert result.ok
     assert result.provider == "fake"
     assert result.model == "test-model"
-    assert json.loads(result.body)["choices"][0]["message"]["content"] == "ok:good"
-    bad = [key for key in store.keys if key.value == "bad"][0]
+    assert json.loads(result.body)["choices"][0]["message"]["content"] == "ok:good-key-0001"
+    bad = [key for key in store.keys if key.value.startswith("bad")][0]
     assert bad.strikes == 1 and not bad.available()
 
 
 def test_failover_on_429_and_cooldown(fake_router):
     store = fake_router["store"]
-    store.path.write_text("fake:rate # label=rate\nfake:good # label=good\n")
+    store.path.write_text("fake:rate-key-0001 # label=rate\nfake:good-key-0001 # label=good\n")
     store.reload(force=True)
     result = _chat(fake_router["router"])
     assert result.ok
-    rate = [key for key in store.keys if key.value == "rate"][0]
+    rate = [key for key in store.keys if key.value.startswith("rate")][0]
     assert not rate.available()
     assert 0 < rate.cooldown_until - __import__("time").time() <= 2
 
 
 def test_500_failover(fake_router):
     store = fake_router["store"]
-    store.path.write_text("fake:server # label=server\nfake:good # label=good\n")
+    store.path.write_text("fake:server-key-0001 # label=server\nfake:good-key-0001 # label=good\n")
     store.reload(force=True)
     assert _chat(fake_router["router"]).ok
 

@@ -149,6 +149,17 @@ def parse_key_line(line: str) -> Optional[Tuple[str, str, str, int, bool]]:
             weight = extra_weight if extra_weight != 1 else weight
             disabled = disabled or extra_disabled
     key = key.strip().strip('"').strip("'")
+    # annotations may sit outside the comment: `provider:key @backup *2`
+    try:
+        key_tokens = shlex.split(key)
+    except ValueError:
+        key_tokens = [key]
+    if key_tokens:
+        key = key_tokens[0]
+        extra_label, extra_weight, extra_disabled = _parse_annotation(" ".join(key_tokens[1:]))
+        label = label or extra_label
+        weight = extra_weight if extra_weight != 1 else weight
+        disabled = disabled or extra_disabled
     if not key:
         return None
     if not provider:

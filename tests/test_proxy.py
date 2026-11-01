@@ -55,7 +55,7 @@ def test_chat_completion_and_headers(fake_router):
         assert status == 200
         assert headers["x-urai-provider"] == "fake"
         assert headers["x-urai-model"] == "test-model"
-        assert json.loads(body)["choices"][0]["message"]["content"] == "ok:good"
+        assert json.loads(body)["choices"][0]["message"]["content"] == "ok:good-key-0001"
     finally:
         server.shutdown()
         server.server_close()
