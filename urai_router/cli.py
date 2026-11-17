@@ -65,6 +65,30 @@ def build_parser() -> argparse.ArgumentParser:
     kp.add_argument("--timeout", type=float, default=12.0)
     keys_sub.add_parser("detect", help="auto-detect providers for unlabelled keys", parents=[common])
 
+    p = add("auth", "Detect and switch credential profiles (Colab / Kaggle / media)")
+    auth_sub = p.add_subparsers(dest="auth_command", required=True)
+    for name, help_text in (
+        ("list", "list profiles and availability"),
+        ("status", "per-service auth status"),
+    ):
+        ap = auth_sub.add_parser(name, help=help_text, parents=[common])
+        ap.add_argument("--json", action="store_true")
+    ap = auth_sub.add_parser("detect", help="detect one or all profiles", parents=[common])
+    ap.add_argument("name", nargs="?")
+    ap.add_argument("--json", action="store_true")
+    ap = auth_sub.add_parser("switch", help="pin a profile active for its service", parents=[common])
+    ap.add_argument("name")
+    ap.add_argument("--json", action="store_true")
+    ap = auth_sub.add_parser("use", help="select the best profile for a service", parents=[common])
+    ap.add_argument("service")
+    ap.add_argument("--preferred")
+    ap.add_argument("--json", action="store_true")
+    ap = auth_sub.add_parser("launch", help="browser-authenticate a Colab profile", parents=[common])
+    ap.add_argument("name")
+    ap.add_argument("--code", help="authorization code (scripted; otherwise prompt)")
+    ap.add_argument("--no-browser", action="store_true", help="print the URL instead of opening it")
+    ap.add_argument("--json", action="store_true")
+
     p = add("models", "List the merged model catalogue")
     p.add_argument("--free", action="store_true", help="free models only")
     p.add_argument("--provider")
@@ -242,6 +266,49 @@ def cmd_keys(args: argparse.Namespace) -> int:
         store.save_state(force=True)
         return 0 if failed == 0 else 1
     return 2
+
+
+def cmd_auth(args: argparse.Namespace) -> int:
+    from .auth_routes import AuthRouter
+
+    router = AuthRouter(keys_path=resolve_keys_file(getattr(args, "keys", None)))
+    sub = args.auth_command
+    if sub == "list":
+        result: Dict[str, Any] = {"profiles": router.detect()}
+    elif sub == "status":
+        result = router.status()
+    elif sub == "detect":
+        result = {"profiles": router.detect(args.name)}
+    elif sub == "switch":
+        result = router.switch(args.name)
+    elif sub == "launch":
+        result = router.launch(args.name, code=getattr(args, "code", None),
+                               open_browser=not getattr(args, "no_browser", False))
+    else:  # use
+        chosen = router.select(args.service, preferred=getattr(args, "preferred", None))
+        result = {
+            "ok": bool(chosen),
+            "service": args.service,
+            "profile": chosen.name if chosen else None,
+            "kind": chosen.kind if chosen else None,
+            "description": chosen.description if chosen else None,
+            "active": router.active(args.service),
+        }
+
+    if getattr(args, "json", False):
+        print(json.dumps(result, indent=2))
+    elif sub in ("list", "detect"):
+        for row in result["profiles"]:
+            state = "ready" if row["available"] else "missing: " + ", ".join(row["missing"])
+            print(f"  {row[chr(110)+chr(97)+chr(109)+chr(101)]:<14} {row[chr(115)+chr(101)+chr(114)+chr(118)+chr(105)+chr(99)+chr(101)]:<8} {state}")
+    elif sub == "status":
+        for service, row in result["services"].items():
+            print(f"  {service:<8} {row[chr(97)+chr(118)+chr(97)+chr(105)+chr(108)+chr(97)+chr(98)+chr(108)+chr(101)]}/{row[chr(112)+chr(114)+chr(111)+chr(102)+chr(105)+chr(108)+chr(101)+chr(115)]} active={row[chr(97)+chr(99)+chr(116)+chr(105)+chr(118)+chr(101)]} recommended={row[chr(114)+chr(101)+chr(99)+chr(111)+chr(109)+chr(109)+chr(101)+chr(110)+chr(100)+chr(101)+chr(100)]}")
+    else:
+        print(result.get("profile") or "none")
+        if not result.get("ok", True):
+            print("error: " + str(result.get("error", "no available profile")), file=sys.stderr)
+    return 0 if result.get("ok", True) else 1
 
 
 def cmd_models(args: argparse.Namespace) -> int:
@@ -484,6 +551,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             "serve": cmd_serve,
             "mcp": cmd_mcp,
             "keys": cmd_keys,
+            "auth": cmd_auth,
             "models": cmd_models,
             "setup": cmd_setup,
             "sync": cmd_sync,
