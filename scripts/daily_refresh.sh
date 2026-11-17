@@ -17,6 +17,8 @@ mkdir -p "$(dirname "$LOG")"
   python3 -m urai_router sync 2>&1 | tail -8
   echo "-- paid balances --"
   python3 -m urai_router keys balance --provider bai 2>&1 | tail -5
+  echo "-- freellmapi free-tier usage --"
+  python3 -m urai_router keys balance --provider freellmapi 2>&1 | tail -5
 } >> "$LOG" 2>&1
 
 tail -n 250 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"

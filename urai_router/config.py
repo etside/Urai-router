@@ -31,6 +31,12 @@ DEFAULTS: Dict[str, Any] = {
     },
     "aliases": {},
     "providers": {},
+    "freellmapi": {
+        # Empty -> FREELLMAPI_BASE_URL env var, then http://127.0.0.1:3001/v1.
+        "base_url": "",
+        # Narrow discovery to models the gateway can serve right now.
+        "models_query": "execution_status=ready",
+    },
     "proxy": {
         "cors": True,
         "enable_ensure": True,

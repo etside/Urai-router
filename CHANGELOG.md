@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased — FreeLLMAPI free-token gateway
+
+- New `freellmapi` provider: one unified `freellmapi-…` key in front of ~87
+  free LLM providers, OpenAI-compatible at `http://127.0.0.1:3001/v1`.
+- Automatic `freellmapi-` key detection and `${FREELLMAPI_KEY}` expansion.
+- Live catalogue discovery via `/v1/models?execution_status=ready`, with a
+  short 120 s TTL so `ready` / `needsKey` / `exhausted` stays current.
+- `auto`, `auto:fast`, `auto:smart`, `auto:reliable`, `auto:balanced`,
+  `auto:cheap` and named `auto:<profile>` chains are marked free and ranked
+  first, so `model=auto` sends one request to `freellmapi/auto` instead of
+  spraying individual gateway models.
+- Monthly token/request accounting through `GET /v1/usage`:
+  `urai-router keys balance --provider freellmapi [--json]`.
+- Configurable gateway: `FREELLMAPI_BASE_URL`, `FREELLMAPI_MODELS_QUERY`,
+  `freellmapi.base_url`, `freellmapi.models_query`, plus the usual
+  `providers.freellmapi.*` overrides.
+- Fixed global `--keys` / `--config` / `--state-dir` being swallowed by
+  subcommand defaults.
+
 ## 0.1.0 — 2026-11-01
 
 Initial release.

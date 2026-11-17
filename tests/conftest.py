@@ -107,7 +107,7 @@ class FakeUpstream(BaseHTTPRequestHandler):
                 ],
                 "usage": {"prompt_tokens": 1, "completion_tokens": 1, "total_tokens": 2},
             },
-            headers={"x-upstream-key": key},
+            headers={"x-upstream-key": key, "X-Routed-Via": f"fake/{model}"},
         )
 
     def _json(self, status: int, payload: Dict[str, Any], headers: Dict[str, str] | None = None) -> None:

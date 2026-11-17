@@ -1,6 +1,12 @@
 # Copy to ~/.config/urai-router/keys.txt and chmod 600.
 # Never commit real keys.
 
+# --- FreeLLMAPI: one unified key in front of ~87 free providers ---
+# Start the gateway (default http://127.0.0.1:3001/v1), copy the key from its
+# dashboard, and paste it here. The `freellmapi-` prefix is auto-detected.
+# freellmapi:freellmapi-REPLACE_ME
+# freellmapi:${FREELLMAPI_KEY}   # or keep the key in an env var
+
 # --- OpenCode Zen (free models included; catalogue is public) ---
 opencode:sk-REPLACE_ME
 

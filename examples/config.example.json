@@ -17,7 +17,12 @@
   },
   "aliases": {
     "fast": "opencode/deepseek-v4.1-flash-free",
-    "cheap": "free"
+    "cheap": "free",
+    "freetokens": "freellmapi/auto"
+  },
+  "freellmapi": {
+    "base_url": "http://127.0.0.1:3001/v1",
+    "models_query": "execution_status=ready"
   },
   "providers": {
     "my-gateway": {

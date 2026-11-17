@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -26,6 +27,27 @@ ZEN_FREE_FALLBACK = [
 ]
 
 
+# FreeLLMAPI aggregates dozens of free tiers behind one local OpenAI-compatible
+# endpoint. These are the router entries it always exposes; the full catalogue is
+# discovered from /v1/models when the gateway is reachable.
+FREELLMAPI_BASE_URL = os.environ.get("FREELLMAPI_BASE_URL", "http://127.0.0.1:3001/v1")
+FREELLMAPI_MODELS_QUERY = os.environ.get("FREELLMAPI_MODELS_QUERY", "execution_status=ready")
+FREELLMAPI_ROUTER_MODELS = (
+    "auto",
+    "auto:fast",
+    "auto:smart",
+    "auto:reliable",
+    "auto:balanced",
+    "auto:cheap",
+)
+
+
+def _models_url(base_url: str, query: str = FREELLMAPI_MODELS_QUERY) -> str:
+    url = base_url.rstrip("/") + "/models"
+    query = (query or "").strip().lstrip("?")
+    return f"{url}?{query}" if query else url
+
+
 @dataclass(frozen=True)
 class Provider:
     id: str
@@ -47,6 +69,16 @@ class Provider:
 
 
 PROVIDER_LIST: List[Provider] = [
+    Provider(
+        "freellmapi",
+        "FreeLLMAPI (free-tier gateway)",
+        FREELLMAPI_BASE_URL,
+        models_url=_models_url(FREELLMAPI_BASE_URL),
+        key_prefixes=("freellmapi-",),
+        detect_order=0,
+        docs="https://github.com/tashfeenahmed/freellmapi",
+        default_models=FREELLMAPI_ROUTER_MODELS,
+    ),
     Provider(
         "opencode",
         "OpenCode Zen",
@@ -313,6 +345,10 @@ PROVIDER_LIST: List[Provider] = [
 PROVIDERS: Dict[str, Provider] = {p.id: p for p in PROVIDER_LIST}
 
 ALIASES: Dict[str, str] = {
+    "freellmapi": "freellmapi",
+    "freellm": "freellmapi",
+    "freeapi": "freellmapi",
+    "llmapi": "freellmapi",
     "zen": "opencode",
     "opencode-zen": "opencode",
     "oc": "opencode",
@@ -390,6 +426,40 @@ def apply_provider_overrides(overrides: Dict[str, Dict[str, Any]]) -> None:
                 register_custom(pid, values)
             except ValueError:
                 continue
+
+
+def configure_freellmapi(values: Optional[Dict[str, Any]] = None) -> None:
+    """Point the freellmapi provider at the right gateway at runtime.
+
+    ``base_url`` may come from ``config.json`` (``freellmapi.base_url`` or
+    ``providers.freellmapi.base_url``) or from ``FREELLMAPI_BASE_URL``. The
+    model list URL is rebuilt from it so a remote/VPS gateway keeps the
+    ``?execution_status=ready`` filter instead of silently probing localhost.
+    """
+    provider = PROVIDERS.get("freellmapi")
+    if provider is None:
+        return
+    values = values or {}
+    base_url = str(values.get("base_url") or provider.base_url or FREELLMAPI_BASE_URL).rstrip("/")
+    if not base_url:
+        return
+    query = values.get("models_query")
+    if query is None:
+        query = FREELLMAPI_MODELS_QUERY
+    models_url = str(values.get("models_url") or "").strip()
+    if not models_url:
+        models_url = _models_url(base_url, str(query))
+    data = asdict(provider)
+    data.update(
+        base_url=base_url,
+        models_url=models_url,
+        default_models=tuple(values.get("default_models") or provider.default_models),
+    )
+    data["key_prefixes"] = tuple(data.get("key_prefixes") or ())
+    data["extra_headers"] = tuple(
+        (str(name), str(value)) for name, value in (data.get("extra_headers") or ())
+    )
+    PROVIDERS["freellmapi"] = Provider(**data)
 
 
 def detect_by_prefix(key: str) -> List[str]:
@@ -473,6 +543,8 @@ def parse_models(provider: Provider, payload: Any) -> List[ModelInfo]:
             info = _parse_zen_model(provider, mid, row)
         elif provider.id == "openrouter":
             info = _parse_openrouter_model(provider, mid, row)
+        elif provider.id == "freellmapi":
+            info = _parse_freellmapi_model(provider, mid, row)
         else:
             info = _parse_generic_model(provider, mid, row)
         models.append(info)
@@ -535,6 +607,40 @@ def _parse_openrouter_model(provider: Provider, mid: str, row: Dict[str, Any]) -
         input_price=input_price,
         output_price=output_price,
         api_style="openai",
+        tools=("tools" in supported) if supported else True,
+        raw=row,
+    )
+
+
+def _parse_freellmapi_model(provider: Provider, mid: str, row: Dict[str, Any]) -> ModelInfo:
+    """Parse one FreeLLMAPI gateway row.
+
+    The gateway exposes two kinds of rows:
+
+    * router entries (``auto``, ``auto:fast``, ``auto:<profile>``) that fail
+      over across every free provider internally;
+    * individual catalog models behind that router.
+
+    Only the router entries are marked free, so ``model=auto`` sends one
+    request to ``freellmapi/auto`` instead of spraying the whole 1,300-model
+    catalog. Individual rows remain addressable as ``freellmapi/<model>``.
+    """
+    status = str(row.get("execution_status") or "").strip().lower()
+    available = row.get("available")
+    is_router = mid == "auto" or mid.startswith("auto:")
+    free = is_router and status != "needskey" and available is not False
+    supported = row.get("supported_parameters") or []
+    return ModelInfo(
+        id=mid,
+        provider=provider.id,
+        name=str(row.get("name") or mid),
+        free=free,
+        context=int(row.get("context_window") or row.get("context_length") or 0),
+        output=int(row.get("max_output_tokens") or 0),
+        # Every gateway model is OpenAI-shaped, including the ones backed by
+        # Anthropic upstreams: freellmapi translates at its own edge.
+        api_style="openai",
+        endpoint=provider.base_url,
         tools=("tools" in supported) if supported else True,
         raw=row,
     )
@@ -633,6 +739,10 @@ class Catalog:
             pass
 
     def ttl_for(self, pid: str) -> float:
+        if pid == "freellmapi":
+            # execution_status (ready / needsKey / exhausted) changes with
+            # upstream cooldowns, so the gateway catalogue is short-lived.
+            return min(self.ttl, 120.0)
         return self.zen_ttl if pid == "opencode" else self.ttl
 
     def stale(self, pid: str) -> bool:
@@ -648,6 +758,18 @@ class Catalog:
             self.errors.pop(pid, None)
 
     def fallback(self, provider: Provider) -> List[ModelInfo]:
+        if provider.id == "freellmapi":
+            return [
+                ModelInfo(
+                    id=mid,
+                    provider=provider.id,
+                    name=mid,
+                    free=mid == "auto" or mid.startswith("auto:"),
+                    api_style="openai",
+                    endpoint=provider.base_url,
+                )
+                for mid in provider.default_models
+            ]
         rows = [ModelInfo(id=mid, provider=provider.id, name=mid, free=("free" in mid or mid == "big-pickle"), api_style=provider.api_style) for mid in provider.default_models]
         if provider.id == "opencode" and not rows:
             rows = [ModelInfo(id=mid, provider="opencode", name=mid, free=True, api_style="openai") for mid in ZEN_FREE_FALLBACK]

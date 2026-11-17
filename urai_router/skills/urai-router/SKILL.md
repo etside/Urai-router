@@ -1,6 +1,6 @@
 ---
 name: urai-router
-description: Route LLM requests across every API key in keys.txt, fail over on 401/403/429/5xx, discover free OpenCode Zen models, and expose the whole pool as an OpenAI-compatible endpoint or MCP tools. Use when a task needs model selection, key rotation, free-model discovery, provider failover, or when the user mentions Urai Router, OpenCode Zen free models, or key pooling.
+description: Route LLM requests across every API key in keys.txt, fail over on 401/403/429/5xx, discover free models (including a FreeLLMAPI free-tier gateway and OpenCode Zen), and expose the whole pool as an OpenAI-compatible endpoint or MCP tools. Use when a task needs model selection, key rotation, free-model discovery, provider failover, or when the user mentions Urai Router, FreeLLMAPI, OpenCode Zen free models, or key pooling.
 license: MIT
 compatibility: opencode, kiro
 metadata:
@@ -36,6 +36,7 @@ Keys live in `~/.config/urai-router/keys.txt` (or `$URAI_KEYS_FILE`). One key
 per line, `provider:key`; a bare key is auto-detected:
 
 ```text
+freellmapi:freellmapi-...   # free-tier gateway (87 providers, one key)
 opencode:sk-...
 openrouter:sk-or-v1-...
 groq:gsk_...
@@ -43,6 +44,11 @@ deepseek:sk-...
 anthropic:sk-ant-...
 google:AIza...
 ```
+
+FreeLLMAPI runs locally by default at `http://127.0.0.1:3001/v1`. Set
+`FREELLMAPI_BASE_URL` (or `freellmapi.base_url` in config.json) for a remote
+gateway. Run `urai-router keys balance --provider freellmapi` to see the
+monthly token/request ledger.
 
 ## Use the MCP tools
 
@@ -88,6 +94,9 @@ export OPENAI_API_KEY=urai-local     # or the configured router token
 
 - `auto` or `best` - free models first, then any usable model.
 - `free` / `urai/free` - free models only.
+- `freellmapi/auto` - the free-tier gateway picks and fails over internally.
+  `auto:fast`, `auto:smart`, `auto:reliable`, `auto:balanced`, `auto:cheap`
+  steer that choice; `freellmapi/<model>` pins one catalog model.
 - `opencode/<id>` - OpenCode Zen (free rows end in `-free`).
 - `openrouter/<id>` - OpenRouter.
 - `<id>` - resolved across the catalogue when unambiguous.

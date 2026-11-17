@@ -25,6 +25,13 @@ AUTO_NAMES = {"", "auto", "best", "default", "urai/auto", "urai-router/auto"}
 FREE_NAMES = {"free", "urai/free", "free-only", "free_only"}
 
 AUTO_RANK = [
+    # FreeLLMAPI router entries: one request fans out across its free pool.
+    "auto",
+    "auto:fast",
+    "auto:smart",
+    "auto:reliable",
+    "auto:balanced",
+    "auto:cheap",
     "deepseek-v4.1-flash-free",
     "glm-5.3-flash-free",
     "big-pickle",
@@ -33,6 +40,14 @@ AUTO_RANK = [
     "beam-free",
     "flint-40b-free",
 ]
+
+# Lower wins when two free models share the same AUTO_RANK. The gateway is
+# ranked behind OpenCode because a healthy Zen key is a single hop, while
+# FreeLLMAPI adds a local service that may be stopped.
+PROVIDER_PREFERENCE = {
+    "freellmapi": 0,
+    "opencode": 1,
+}
 
 RETRYABLE = {401, 403, 408, 409, 425, 429, 500, 502, 503, 504, 529}
 
@@ -70,9 +85,18 @@ class Router:
     def __init__(self, cfg: Config, store: KeyStore, catalog: Optional[Catalog] = None):
         self.cfg = cfg
         self.store = store
-        from .providers import apply_provider_overrides
+        from .providers import apply_provider_overrides, configure_freellmapi
 
         apply_provider_overrides(cfg.provider_overrides)
+        freellmapi_cfg = dict(cfg.get("freellmapi") or {})
+        freellmapi_cfg.update(
+            {
+                key: value
+                for key, value in (cfg.provider_overrides.get("freellmapi") or {}).items()
+                if key in {"base_url", "models_url", "models_query", "default_models"}
+            }
+        )
+        configure_freellmapi(freellmapi_cfg)
         self.catalog = catalog or Catalog(ttl=float(cfg.get("catalog_ttl", 900)), zen_ttl=float(cfg.get("zen_ttl", 300)))
         self._lock = threading.RLock()
         self._detection_done = False
@@ -191,9 +215,9 @@ class Router:
         usable.sort(
             key=lambda m: (
                 not m.free,
-                m.provider != "opencode",
-                m.provider in local,
                 AUTO_RANK.index(m.id) if m.id in AUTO_RANK else 50,
+                PROVIDER_PREFERENCE.get(m.provider, 50),
+                m.provider in local,
                 PROVIDERS[m.provider].detect_order,
                 m.id.lower(),
             )
@@ -396,6 +420,18 @@ class Router:
                 "x-urai-key": key.label if key and key.label else (key.id[:8] if key else "keyless"),
                 "x-urai-attempts": str(len(attempts) + 1),
             }
+            # FreeLLMAPI exposes which free provider actually served the call
+            # (and the failed hops). Forward the observability headers so a
+            # client of urai-router can see the same trail.
+            for upstream_header in (
+                "x-routed-via",
+                "x-fallback-attempts",
+                "x-fallback-trail",
+                "x-fallback-detail",
+            ):
+                value = resp.headers.get(upstream_header)
+                if value:
+                    response_headers[upstream_header] = value
             if body.get("stream"):
                 response_headers["Content-Type"] = "text/event-stream; charset=utf-8"
                 response_headers["Cache-Control"] = "no-cache"

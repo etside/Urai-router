@@ -59,7 +59,96 @@ the VPS as a 03:30 cron. Log: `~/.local/state/urai-router/daily-refresh.log`.
 > The daily job keeps credential health and catalogues fresh — it does not
 > manufacture daily credits.
 
+## Free AI tokens via FreeLLMAPI
+
+[FreeLLMAPI](https://github.com/tashfeenahmed/freellmapi) aggregates the free
+tiers of ~87 providers behind **one** OpenAI-compatible endpoint and **one**
+`freellmapi-…` key. Urai Router treats it as a first-class provider, so the
+free pool joins the same rotation, failover and `model=auto` routing as every
+other key.
+
+```text
+urai-router  ──►  FreeLLMAPI :3001  ──►  87 free providers
+   auto             (its own         (Gemini, Groq, Cerebras,
+   failover          fallback         Mistral, OpenRouter, …)
+   usage             chain)
+```
+
+### 1. Start the gateway
+
+```bash
+git clone https://github.com/tashfeenahmed/freellmapi.git
+cd freellmapi
+npm install
+npm run dev            # API on http://localhost:3001, dashboard on :5173
+```
+
+Open the dashboard, add the provider keys you already have, then copy the
+unified key from the **Keys** page header. It starts with `freellmapi-`.
+
+### 2. Add the key
+
+```bash
+urai-router init
+$EDITOR ~/.config/urai-router/keys.txt
+```
+
+```text
+freellmapi:freellmapi-your-unified-key
+# or keep it out of the file:
+freellmapi:${FREELLMAPI_KEY}
+```
+
+The `freellmapi-` prefix is detected automatically, so a bare key works too.
+When FreeLLMAPI runs on another machine or a VPS, point the router at it:
+
+```bash
+export FREELLMAPI_BASE_URL=http://192.168.1.50:3001/v1
+# or in ~/.config/urai-router/config.json:
+# { "freellmapi": { "base_url": "http://192.168.1.50:3001/v1" } }
+```
+
+`providers.freellmapi.base_url` is also honoured, and
+`FREELLMAPI_MODELS_QUERY` / `freellmapi.models_query` change the catalogue
+filter (default `execution_status=ready`).
+
+### 3. Verify and use
+
+```bash
+urai-router models --provider freellmapi --refresh   # live catalogue
+urai-router explain --model auto                     # freellmapi/auto ranks first
+urai-router test --model auto --prompt "say pong"
+urai-router keys balance --provider freellmapi       # monthly tokens + requests
+urai-router serve                                    # then use model=auto anywhere
+```
+
+Every model behind the gateway is addressable explicitly, e.g.
+`freellmapi/gemini-2.5-flash` or `freellmapi/auto:fast`. The router entries
+(`auto`, `auto:fast`, `auto:smart`, `auto:reliable`, `auto:balanced`,
+`auto:cheap`, and named `auto:<profile>` chains) are marked **free**, so
+`model=auto` sends **one** request to `freellmapi/auto` — the gateway does the
+1,300-model fan-out internally. Individual catalogue rows are shown but not
+marked free, which keeps `urai-router models --free` readable and prevents
+`auto` from spraying dozens of gateway models.
+
+Token accounting uses the gateway's own ledger, so
+`urai-router keys balance --provider freellmapi` reports exactly what the
+free tiers consumed this month:
+
+```text
+ok   freellmapi   local-free   freell…a1b2   tokens=104000000 requests=152 month=2026-11
+```
+
+Add `--json` for `by_platform` / `byKey`-style breakdowns. Provider keys never
+leave the FreeLLMAPI process; Urai Router only stores the unified key in
+`keys.txt` (mode 600).
+
+> FreeLLMAPI is a local service: if it is stopped, `freellmapi/auto` fails over
+> to the next free target (OpenCode Zen or another keyed provider) like any
+> other upstream.
+
 ## Why this exists (audit first)
+
 
 The project started with an audit of existing open-source routers. The summary is
 in [`docs/AUDIT.md`](docs/AUDIT.md). In short:
@@ -140,7 +229,7 @@ chmod 600 ~/.config/urai-router/keys.txt
 
 Registered out of the box:
 
-`opencode` (Zen), `openrouter`, `openai`, `deepseek`, `groq`, `anthropic`,
+`freellmapi` (free-tier gateway), `opencode` (Zen), `openrouter`, `openai`, `deepseek`, `groq`, `anthropic`,
 `google` (Gemini OpenAI endpoint), `xai`, `nvidia`, `moonshot`, `mistral`,
 `together`, `fireworks`, `cerebras`, `huggingface`, `zai`, `minimax`,
 `deepinfra`, `perplexity`, `github` models, `nebius`, `sambanova`, `cohere`,

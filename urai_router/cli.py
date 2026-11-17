@@ -24,9 +24,9 @@ COMMON_DEFAULTS = argparse.SUPPRESS
 
 def _common() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(add_help=False)
-    parser.add_argument("--keys", help="keys.txt path (default: auto-discover)")
-    parser.add_argument("--config", help="config.json path")
-    parser.add_argument("--state-dir", help="state directory override")
+    parser.add_argument("--keys", default=COMMON_DEFAULTS, help="keys.txt path (default: auto-discover)")
+    parser.add_argument("--config", default=COMMON_DEFAULTS, help="config.json path")
+    parser.add_argument("--state-dir", default=COMMON_DEFAULTS, help="state directory override")
     parser.add_argument("-v", "--verbose", action="store_true", default=COMMON_DEFAULTS, help="verbose logging")
     return parser
 
@@ -292,7 +292,12 @@ def cmd_keys(args: argparse.Namespace) -> int:
             for row in rows:
                 amount = row.get("balance")
                 state = "ok" if row.get("ok") else "n/a"
-                detail = f"balance={amount} {row.get('unit','')}" if amount is not None else row.get("error", "not supported")
+                if row.get("summary"):
+                    detail = row["summary"]
+                elif amount is not None:
+                    detail = f"balance={amount} {row.get('unit','')}"
+                else:
+                    detail = row.get("error", "not supported")
                 print(f"{state:4} {row['provider']:12} {row['label']:12} {row['key']:18} {detail}")
         return 0 if all(row.get("ok") for row in rows) else 1
     return 2
