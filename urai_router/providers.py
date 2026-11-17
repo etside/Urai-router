@@ -73,6 +73,16 @@ PROVIDER_LIST: List[Provider] = [
         ),
     ),
     Provider(
+        "cerebras",
+        "Cerebras Inference",
+        "https://api.cerebras.ai/v1",
+        models_url="https://api.cerebras.ai/v1/models",
+        key_prefixes=("csk-",),
+        detect_order=4,
+        docs="https://inference-docs.cerebras.ai",
+        default_models=("qwen-3.8-27b", "gpt-oss-120b"),
+    ),
+    Provider(
         "vercel",
         "Vercel AI Gateway",
         "https://ai-gateway.vercel.sh/v1",

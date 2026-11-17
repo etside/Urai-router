@@ -32,6 +32,7 @@ Beyond the built-in providers, this deployment adds:
 |---|---|---|
 | `bai` | `https://api.b.ai/v1` | paid key (73 models incl. GPT-6.x, Claude 5.x, image/video, `jev-*`); live balance via `/v1/balance` |
 | `vercel` | `https://ai-gateway.vercel.sh/v1` | 513 models |
+| `cerebras` | `https://api.cerebras.ai/v1` | two very fast models (`qwen-3.8-27b`, `gpt-oss-120b`), ~1850–3000 tok/s |
 | `openrouter` | `https://openrouter.ai/api/v1` | 470 models, many `:free` |
 | `opencode` / `ollama` | public / local | free catalog and local CPU/GPU inference, no key needed |
 
@@ -47,6 +48,16 @@ serves the merged catalogue (1,070 models in this deployment) and rotates
 keys on 401/403/429/5xx, so one exhausted key falls through to the next.
 Public-catalog providers (OpenCode, local Ollama) are usable without a key; a
 429 from a free endpoint is reported honestly rather than faked.
+
+**Daily refresh:** `scripts/daily_refresh.sh` re-probes keys (free authenticated
+`/models` calls), syncs catalogues and snapshots paid balances. Installed on
+the VPS as a 03:30 cron. Log: `~/.local/state/urai-router/daily-refresh.log`.
+
+> Honest note on Cerebras: its quota is a **continuously replenishing token
+> bucket**, not a daily-resetting free allowance. New accounts get $5 in trial
+> credits expiring after 30 days; there is no permanently-free daily tier.
+> The daily job keeps credential health and catalogues fresh — it does not
+> manufacture daily credits.
 
 ## Why this exists (audit first)
 
