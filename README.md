@@ -24,6 +24,30 @@ urai-router doctor
 
 ---
 
+## Paid gateways + free models (production pool)
+
+Beyond the built-in providers, this deployment adds:
+
+| Provider id | Base | Notes |
+|---|---|---|
+| `bai` | `https://api.b.ai/v1` | paid key (73 models incl. GPT-6.x, Claude 5.x, image/video, `jev-*`); live balance via `/v1/balance` |
+| `vercel` | `https://ai-gateway.vercel.sh/v1` | 513 models |
+| `openrouter` | `https://openrouter.ai/api/v1` | 470 models, many `:free` |
+| `opencode` / `ollama` | public / local | free catalog and local CPU/GPU inference, no key needed |
+
+```bash
+urai-router keys check                       # free authenticated /models probes
+urai-router keys balance --provider bai      # live token balance (never prints the key)
+urai-router models --free                    # free models across every provider
+urai-router serve --port 8792                # OpenAI-compatible proxy on :8792
+```
+
+Keys live only in `~/.config/urai-router/keys.txt` (mode 600). The router
+serves the merged catalogue (1,070 models in this deployment) and rotates
+keys on 401/403/429/5xx, so one exhausted key falls through to the next.
+Public-catalog providers (OpenCode, local Ollama) are usable without a key; a
+429 from a free endpoint is reported honestly rather than faked.
+
 ## Why this exists (audit first)
 
 The project started with an audit of existing open-source routers. The summary is

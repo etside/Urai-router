@@ -129,7 +129,10 @@ class Router:
         provider = PROVIDERS.get(pid)
         if not provider:
             return False
-        if provider.keyless:
+        # Public-catalog providers expose free models without a key; treating
+        # them as unusable would hide exactly the free tier this router exists
+        # to surface.
+        if provider.keyless or provider.public_catalog:
             return True
         return bool(self.store.available_keys(pid)) or bool(self.store.keys_for(pid))
 
@@ -260,7 +263,7 @@ class Router:
                 break
             provider = target.provider
             keys = self.store.available_keys(provider.id)
-            keyless = provider.keyless
+            keyless = provider.keyless or provider.public_catalog
             if not keys and not keyless:
                 attempts.append(
                     {

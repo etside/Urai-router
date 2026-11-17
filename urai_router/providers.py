@@ -60,6 +60,29 @@ PROVIDER_LIST: List[Provider] = [
         public_catalog=True,
     ),
     Provider(
+        "bai",
+        "b.ai paid gateway",
+        "https://api.b.ai/v1",
+        models_url="https://api.b.ai/v1/models",
+        key_prefixes=("sk-",),
+        detect_order=1,
+        docs="https://api.b.ai",
+        default_models=(
+            "gpt-5.6-sol", "claude-sonnet-5.5", "deepseek-v4.1-flash",
+            "glm-5.3-flash", "kimi-k3.1-pro", "minimax-m3.1-flash",
+        ),
+    ),
+    Provider(
+        "vercel",
+        "Vercel AI Gateway",
+        "https://ai-gateway.vercel.sh/v1",
+        models_url="https://ai-gateway.vercel.sh/v1/models",
+        key_prefixes=("vck_",),
+        detect_order=3,
+        docs="https://vercel.com/docs/ai-gateway",
+        default_models=("openai/gpt-5-nano", "anthropic/claude-3.5-haiku"),
+    ),
+    Provider(
         "openrouter",
         "OpenRouter",
         "https://openrouter.ai/api/v1",
@@ -734,7 +757,27 @@ def key_hint(provider: Provider) -> str:
 
 
 def probe_key(provider: Provider, key: str, timeout: float = 12.0) -> bool:
-    """Validate a key with a 1-token chat request (models endpoints can be public)."""
+    """Validate a key without spending tokens when the catalog accepts auth.
+
+    The authenticated /models endpoint is free and proves the key is accepted
+    by the gateway. Only providers that hide it fall back to a 1-token chat.
+    """
+    headers: Dict[str, str] = {}
+    if provider.auth == "bearer":
+        headers["Authorization"] = f"Bearer {key}"
+    elif provider.auth == "x-api-key":
+        headers["x-api-key"] = key
+    try:
+        resp = http_request(provider.model_url(), method="GET", headers=headers, timeout=timeout)
+        try:
+            resp.read()
+        finally:
+            resp.close()
+        if 200 <= resp.status < 300:
+            return True
+    except Exception:
+        pass
+
     body = {
         "model": (provider.default_models or ("",))[0],
         "messages": [{"role": "user", "content": "ping"}],

@@ -64,6 +64,10 @@ def build_parser() -> argparse.ArgumentParser:
     kp.add_argument("--provider")
     kp.add_argument("--timeout", type=float, default=12.0)
     keys_sub.add_parser("detect", help="auto-detect providers for unlabelled keys", parents=[common])
+    kp = keys_sub.add_parser("balance", help="probe paid-provider token balance", parents=[common])
+    kp.add_argument("--provider")
+    kp.add_argument("--timeout", type=float, default=12.0)
+    kp.add_argument("--json", action="store_true")
 
     p = add("auth", "Detect and switch credential profiles (Colab / Kaggle / media)")
     auth_sub = p.add_subparsers(dest="auth_command", required=True)
@@ -265,6 +269,32 @@ def cmd_keys(args: argparse.Namespace) -> int:
             print(f"{status:6} {key.provider:12} {key.label or key.id[:8]:12} {key.masked} {row['error']}")
         store.save_state(force=True)
         return 0 if failed == 0 else 1
+    if command == "balance":
+        from .balances import probe_balance
+
+        keys = [k for k in store.keys if not args.provider or k.provider == args.provider]
+        if not keys:
+            print(f"no keys to check in {store.path}")
+            return 1
+        rows = []
+        for key in keys:
+            provider = PROVIDERS.get(key.provider)
+            row = probe_balance(provider, key.value, timeout=args.timeout) if provider else {
+                "ok": False, "supported": False, "provider": key.provider,
+                "error": "unknown provider",
+            }
+            row["key"] = key.masked
+            row["label"] = key.label or key.id[:8]
+            rows.append(row)
+        if getattr(args, "json", False):
+            print(json.dumps(rows, indent=2))
+        else:
+            for row in rows:
+                amount = row.get("balance")
+                state = "ok" if row.get("ok") else "n/a"
+                detail = f"balance={amount} {row.get('unit','')}" if amount is not None else row.get("error", "not supported")
+                print(f"{state:4} {row['provider']:12} {row['label']:12} {row['key']:18} {detail}")
+        return 0 if all(row.get("ok") for row in rows) else 1
     return 2
 
 
