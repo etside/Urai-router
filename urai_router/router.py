@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Set, Tuple
 
 from . import adapters
-from .config import Config
+from .config import Config, freellmapi_settings
 from .keys import Key, KeyStore
 from .providers import (
     PROVIDERS,
@@ -88,15 +88,7 @@ class Router:
         from .providers import apply_provider_overrides, configure_freellmapi
 
         apply_provider_overrides(cfg.provider_overrides)
-        freellmapi_cfg = dict(cfg.get("freellmapi") or {})
-        freellmapi_cfg.update(
-            {
-                key: value
-                for key, value in (cfg.provider_overrides.get("freellmapi") or {}).items()
-                if key in {"base_url", "models_url", "models_query", "default_models"}
-            }
-        )
-        configure_freellmapi(freellmapi_cfg)
+        configure_freellmapi(freellmapi_settings(cfg))
         self.catalog = catalog or Catalog(ttl=float(cfg.get("catalog_ttl", 900)), zen_ttl=float(cfg.get("zen_ttl", 300)))
         self._lock = threading.RLock()
         self._detection_done = False

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from . import config_writer
-from .config import Config, load_config, resolve_keys_file
+from .config import Config, freellmapi_settings, load_config, resolve_keys_file
 from .keys import UNKNOWN, KeyStore, write_example_keys
 from .providers import PROVIDERS, probe_key, provider_summary
 from .router import Router
@@ -148,9 +148,10 @@ def _context(args: argparse.Namespace) -> tuple[Config, KeyStore]:
         cfg.set("detect_unknown_keys", False)
     if getattr(args, "state_dir", None):
         os.environ["URAI_STATE_DIR"] = str(Path(args.state_dir).expanduser())
-    from .providers import apply_provider_overrides
+    from .providers import apply_provider_overrides, configure_freellmapi
 
     apply_provider_overrides(cfg.provider_overrides)
+    configure_freellmapi(freellmapi_settings(cfg))
     keys_file = resolve_keys_file(getattr(args, "keys", None) or cfg.get("keys_file"))
     store = KeyStore(keys_file, cfg)
     return cfg, store

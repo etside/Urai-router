@@ -127,6 +127,24 @@ class Config:
         return result
 
 
+def freellmapi_settings(cfg: Config) -> Dict[str, Any]:
+    """Resolve the FreeLLMAPI gateway settings for a config.
+
+    ``freellmapi.*`` holds the primary values; ``providers.freellmapi.*`` may
+    override the connection fields for one-off deployments, mirroring how the
+    generic provider overrides work.
+    """
+    merged = dict(cfg.get("freellmapi") or {})
+    merged.update(
+        {
+            key: value
+            for key, value in (cfg.provider_overrides.get("freellmapi") or {}).items()
+            if key in {"base_url", "models_url", "models_query", "default_models"}
+        }
+    )
+    return merged
+
+
 def load_config(explicit: Optional[str] = None, create: bool = False) -> Config:
     path = Path(os.path.expanduser(str(explicit))).resolve() if explicit else default_config_path()
     raw = read_json(path, {}) or {}

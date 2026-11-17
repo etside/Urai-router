@@ -119,6 +119,37 @@ def test_freellmapi_config_rebuilds_models_url():
         PROVIDERS["freellmapi"] = original
 
 
+def test_freellmapi_cli_context_honours_config(tmp_path):
+    import argparse
+
+    from urai_router import cli
+    from urai_router.config import freellmapi_settings
+
+    cfg_path = tmp_path / "config.json"
+    cfg_path.write_text(json.dumps({"freellmapi": {"base_url": "http://127.0.0.1:3011/v1"}}))
+    keys_path = tmp_path / "keys.txt"
+    keys_path.write_text("")
+
+    original = PROVIDERS["freellmapi"]
+    try:
+        args = argparse.Namespace(
+            config=str(cfg_path),
+            keys=str(keys_path),
+            no_detect=True,
+            state_dir=None,
+            host=None,
+            port=None,
+            token=None,
+        )
+        cfg, _store = cli._context(args)
+        assert freellmapi_settings(cfg)["base_url"] == "http://127.0.0.1:3011/v1"
+        # Commands that never build a Router (keys balance, doctor) still see it.
+        assert PROVIDERS["freellmapi"].base_url == "http://127.0.0.1:3011/v1"
+        assert PROVIDERS["freellmapi"].models_url.endswith("?execution_status=ready")
+    finally:
+        PROVIDERS["freellmapi"] = original
+
+
 def test_freellmapi_usage_ledger(monkeypatch):
     from urai_router import balances
 
